@@ -8,6 +8,6 @@ services:
       # UPDATE THESE WITH YOUR DETAILS:
       - JELLYFIN_URL=http://YOUR_JELLYFIN_IP:8096
       - JELLYFIN_API_KEY=your_api_key_here
-      - JELLYFIN_USER_ID=your_user_id_here
+      - JELLYFIN_USER_ID=your_user_hex_id_here
       - LIMIT=6
     restart: unless-stopped
