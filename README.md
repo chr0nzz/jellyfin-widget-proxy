@@ -31,9 +31,9 @@
 
   ```yaml
   services:
-    jellyfin-widget-widget-proxy:
+    jellyfin-widget-proxy:
       image: ghcr.io/chr0nzz/jellyfin-widget-proxy:latest
-      container_name: jellyfin-proxy
+      container_name: jellyfin-widget-proxy
       restart: unless-stopped
       ports:
         - "5000:5000"
