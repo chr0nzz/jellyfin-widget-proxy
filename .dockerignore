@@ -13,6 +13,8 @@ venv/
 build/
 dist/
 images/
+custom.css
+custom.js
 
 # Docker
 docker-compose.yml
