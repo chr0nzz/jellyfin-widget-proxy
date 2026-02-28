@@ -1,4 +1,5 @@
   # 🎬 jellyfin-widget-proxy
+  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
   ---
   jellyfin-widget-proxy is a custom integration for the [Homepage](https://gethomepage.dev) dashboard that displays a beautiful, interactive poster grid of recently added movies and TV shows from your Jellyfin server via a lightweight proxy.
   ---
