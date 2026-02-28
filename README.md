@@ -31,7 +31,7 @@
 
   ```yaml
   services:
-    jellyfin-widget-proxy:
+    jellyfin-widget-widget-proxy:
       image: ghcr.io/chr0nzz/jellyfin-widget-proxy:latest
       container_name: jellyfin-proxy
       restart: unless-stopped
