@@ -121,4 +121,6 @@
   Issues and pull requests are welcome! Feel free to open a ticket if you have suggestions for new features.
 
   ## 📄 License
-  This project is licensed under the MIT License.
+
+  This project is licensed under the **GNU General Public License v3.0**.
+  Copyright (C) 2026 chronzz (<https://github.com/chr0nzz>)
