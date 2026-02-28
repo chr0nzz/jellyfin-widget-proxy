@@ -32,7 +32,8 @@ def get_recent():
         return jsonify({"error": "JELLYFIN_API_KEY and JELLYFIN_USER_ID must be set"}), 500
         
     headers = {"Authorization": f'MediaBrowser Token="{JELLYFIN_API_KEY}"'}
-    url = f"{JELLYFIN_URL}/Users/{JELLYFIN_USER_ID}/Items/Latest?Limit={LIMIT}&IncludeItemTypes=Movie,Series"
+    
+    url = f"{JELLYFIN_URL}/Users/{JELLYFIN_USER_ID}/Items/Latest?Limit={LIMIT}&IncludeItemTypes=Movie,Episode"
     
     try:
         logger.info(f"Fetching latest items from Jellyfin...")
@@ -43,13 +44,20 @@ def get_recent():
         results = []
         for item in data:
             item_id = item.get("Id")
-            poster_url = f"{JELLYFIN_URL}/Items/{item_id}/Images/Primary?fillWidth=200&quality=90"
+            item_type = item.get("Type")
+            
+            is_episode = item_type == "Episode"
+            display_title = item.get("SeriesName") if is_episode else item.get("Name")
+            
+            poster_id = item.get("SeriesId") if is_episode else item_id
+            
+            poster_url = f"{JELLYFIN_URL}/Items/{poster_id}/Images/Primary?fillWidth=200&quality=90"
             link = f"{JELLYFIN_URL}/web/index.html#!/details?id={item_id}&serverId={item.get('ServerId')}"
             
             results.append({
                 "id": item_id,
-                "title": item.get("Name"),
-                "type": item.get("Type"),
+                "title": display_title,
+                "type": "TV" if is_episode else "Movie",
                 "year": item.get("ProductionYear", ""),
                 "poster": poster_url,
                 "link": link
