@@ -41,7 +41,8 @@ function injectJellyfinPosters() {
 
                     const badge = document.createElement('span');
                     badge.className = 'jellyfin-recent-badge';
-                    badge.innerText = item.type === "Series" ? "TV" : "Movie";
+                    
+                    badge.innerText = item.type === "TV" ? "TV" : "Movie";
 
                     linkWrap.appendChild(img);
                     linkWrap.appendChild(badge);
