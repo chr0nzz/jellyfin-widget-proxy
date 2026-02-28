@@ -93,13 +93,13 @@
   - Media:
       - Latest Movies & Shows:
           id: jellyfin-recently-added
-          href: https://jellyfin.yourdomain.com
+          #href: https://jellyfin.yourdomain.com
           #icon: sh-jellyfin
   ```
 
   ### Custom Scripts & Styles
-  1. Copy the contents of `custom.js` into your Homepage `config/custom.js`.
-  2. Copy the styles from `custom.css` into your Homepage `config/custom.css`.
+  1. Copy the contents of [custom.js](/custom.js) into your Homepage `config/custom.js`.
+  2. Copy the styles from [custom.css](/custom.css) into your Homepage `config/custom.css`.
 
   > [!IMPORTANT]
   > Ensure you update the `proxyApiUrl` variable in `custom.js` to point to your proxy container's IP (e.g., `http://192.168.1.100:5000/recent`).
