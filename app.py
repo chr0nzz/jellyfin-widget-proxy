@@ -84,4 +84,4 @@ if __name__ == '__main__':
     logger.info("🚀 Jellyfin Proxy: Development server starting...")
     app.run(host='0.0.0.0', port=5000)
 else:
-    logger.info("✅ Jellyfin Proxy: Server is UP and Ready (Gunicorn)")
+    logger.info("✅ Jellyfin Proxy: Server is UP and Ready")
