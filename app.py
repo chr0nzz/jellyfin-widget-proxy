@@ -1,87 +1,212 @@
 import os
-import requests
+import time
+import shutil
 import logging
-from flask import Flask, jsonify
-from flask_cors import CORS
+from flask import Flask, render_template, request, redirect, url_for, flash
+from ruamel.yaml import YAML
+from io import StringIO
+
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
+
+CONFIG_PATH = '/app/config/dynamic.yml'
+BACKUP_DIR = '/app/backups'
+DEFAULT_RESOLVER = os.environ.get('CERT_RESOLVER', 'cloudflare')
+
+DOMAINS_ENV = os.environ.get('DOMAINS', 'example.com')
+AVAILABLE_DOMAINS = [d.strip() for d in DOMAINS_ENV.split(',') if d.strip()]
+if not AVAILABLE_DOMAINS:
+    AVAILABLE_DOMAINS = ['example.com']
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("jellyfin_proxy")
+logger = logging.getLogger(__name__)
 
-app = Flask("jellyfin_proxy")
-CORS(app)
+yaml = YAML()
+yaml.preserve_quotes = True
+yaml.indent(mapping=2, sequence=4, offset=2)
+yaml.width = 4096
 
-JELLYFIN_URL = os.environ.get("JELLYFIN_URL", "http://192.168.1.100:8096").rstrip('/')
-JELLYFIN_API_KEY = os.environ.get("JELLYFIN_API_KEY", "")
-JELLYFIN_USER_ID = os.environ.get("JELLYFIN_USER_ID", "")
-LIMIT = int(os.environ.get("LIMIT", "6"))
+def ensure_backup_dir():
+    if not os.path.exists(BACKUP_DIR):
+        os.makedirs(BACKUP_DIR)
 
-@app.route('/health')
-def health_check():
-    return jsonify({"status": "healthy"}), 200
+def create_backup():
+    """Creates a timestamped backup of the dynamic.yml file."""
+    ensure_backup_dir()
+    if os.path.exists(CONFIG_PATH):
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        backup_path = os.path.join(BACKUP_DIR, f"dynamic.yml.{timestamp}.bak")
+        shutil.copy2(CONFIG_PATH, backup_path)
+        logger.info(f"Backup created: {backup_path}")
+        return True
+    return False
 
-logger.info("jellyfin-proxy-widget starting...")
-logger.info(f"JELLYFIN_URL={JELLYFIN_URL}")
-logger.info(f"API_KEY_SET={'Yes' if JELLYFIN_API_KEY else 'No'}")
-logger.info(f"USER_ID_SET={'Yes' if JELLYFIN_USER_ID else 'No'}")
-logger.info(f"LIMIT={LIMIT}")
+def load_config():
+    """Loads the YAML config safely."""
+    if not os.path.exists(CONFIG_PATH):
+        return {"http": {"routers": {}, "services": {}, "middlewares": {}}}
+    with open(CONFIG_PATH, 'r') as f:
+        data = yaml.load(f)
+        return data if data and isinstance(data, dict) else {"http": {"routers": {}, "services": {}, "middlewares": {}}}
 
-@app.route('/recent')
-def get_recent():
-    if not JELLYFIN_API_KEY or not JELLYFIN_USER_ID:
-        logger.error("Missing configuration: API Key or User ID not set")
-        return jsonify({"error": "JELLYFIN_API_KEY and JELLYFIN_USER_ID must be set"}), 500
+def save_config(data):
+    """Saves the YAML config."""
+    with open(CONFIG_PATH, 'w') as f:
+        yaml.dump(data, f)
+
+@app.route('/')
+def index():
+    config = load_config()
+    apps = []
+    
+    http_config = config.get('http', {})
+    routers = http_config.get('routers', {})
+    services = http_config.get('services', {})
+    middlewares_dict = http_config.get('middlewares', {})
+    
+    for router_name, router_data in routers.items():
+        service_name = router_data.get('service', '')
         
-    headers = {"Authorization": f'MediaBrowser Token="{JELLYFIN_API_KEY}"'}
-    
-    url = f"{JELLYFIN_URL}/Users/{JELLYFIN_USER_ID}/Items"
-    
-    params = {
-        "SortBy": "DateCreated",
-        "SortOrder": "Descending",
-        "IncludeItemTypes": "Movie,Episode",
-        "Recursive": "true",
-        "Fields": "PrimaryImageAspectRatio,ProductionYear,ServerId,SeriesId,SeriesName",
-        "Limit": LIMIT,
-        "ImageTypeLimit": 1,
-        "EnableImageTypes": "Primary"
-    }
-    
+        target_url = "N/A"
+        if service_name in services:
+            servers = services[service_name].get('loadBalancer', {}).get('servers', [])
+            if servers:
+                target_url = servers[0].get('url', 'Unknown')
+
+        apps.append({
+            'id': router_name,
+            'name': router_name,
+            'rule': router_data.get('rule', ''),
+            'service_name': service_name,
+            'target': target_url,
+            'middlewares': router_data.get('middlewares', []),
+            'entryPoints': router_data.get('entryPoints', [])
+        })
+
+    middlewares = []
+    for mw_name, mw_data in middlewares_dict.items():
+        buf = StringIO()
+        yaml.dump(mw_data, buf)
+        middlewares.append({
+            'name': mw_name,
+            'yaml': buf.getvalue()
+        })
+
+    return render_template('index.html', apps=apps, domains=AVAILABLE_DOMAINS, middlewares=middlewares)
+
+@app.route('/save', methods=['POST'])
+def save_entry():
     try:
-        logger.info(f"Fetching recently added items via recursive search...")
-        r = requests.get(url, headers=headers, params=params, timeout=10)
-        r.raise_for_status()
-        data = r.json().get("Items", [])
+        svc_name = request.form.get('serviceName').strip()
+        subdomain = request.form.get('subdomain', '').strip()
+        domain = request.form.get('domain', AVAILABLE_DOMAINS[0]).strip()
+        target_ip = request.form.get('targetIp').strip()
+        target_port = request.form.get('targetPort').strip()
+        middlewares_input = request.form.get('middlewares', '').strip()
         
-        results = []
-        for item in data:
-            item_id = item.get("Id")
-            item_type = item.get("Type")
+        is_edit = request.form.get('isEdit') == 'true'
+        original_id = request.form.get('originalId')
+
+        router_name = svc_name
+        service_name = f"{svc_name}-service"
+        
+        if '.' in subdomain:
+            rule = f"Host(`{subdomain}`)"
+        else:
+            rule = f"Host(`{subdomain}.{domain}`)" if subdomain else f"Host(`{domain}`)"
             
-            is_episode = item_type == "Episode"
-            display_title = item.get("SeriesName") if is_episode else item.get("Name")
+        if not target_ip.startswith('http'):
+            target_url = f"http://{target_ip}:{target_port}"
+        else:
+            target_url = f"{target_ip}:{target_port}"
+
+        middlewares = [m.strip() for m in middlewares_input.split(',')] if middlewares_input else []
+
+        create_backup()
+        config = load_config()
+        if 'http' not in config: config['http'] = {}
+        if 'routers' not in config['http']: config['http']['routers'] = {}
+        if 'services' not in config['http']: config['http']['services'] = {}
+
+        if is_edit and original_id and original_id != router_name:
+            if original_id in config['http']['routers']:
+                del config['http']['routers'][original_id]
+            old_svc_name = f"{original_id}-service"
+            if old_svc_name in config['http']['services']:
+                del config['http']['services'][old_svc_name]
+
+        router_def = {
+            'rule': rule,
+            'entryPoints': ['https'],
+            'tls': {'certResolver': DEFAULT_RESOLVER},
+            'service': service_name
+        }
+        if middlewares:
+            router_def['middlewares'] = middlewares
             
-            poster_id = item.get("SeriesId") if is_episode else item_id
-            
-            poster_url = f"{JELLYFIN_URL}/Items/{poster_id}/Images/Primary?fillWidth=200&quality=90"
-            link = f"{JELLYFIN_URL}/web/index.html#!/details?id={item_id}&serverId={item.get('ServerId')}"
-            
-            results.append({
-                "id": item_id,
-                "title": display_title,
-                "type": "TV" if is_episode else "Movie",
-                "year": item.get("ProductionYear", ""),
-                "poster": poster_url,
-                "link": link
-            })
-            
-        logger.info(f"Successfully returned {len(results)} items")
-        return jsonify(results)
+        config['http']['routers'][router_name] = router_def
+        config['http']['services'][service_name] = {
+            'loadBalancer': {'servers': [{'url': target_url}]}
+        }
+
+        save_config(config)
+        flash(f"Successfully saved {svc_name}", "success")
     except Exception as e:
-        logger.error(f"Error fetching from Jellyfin: {e}")
-        return jsonify({"error": "Failed to fetch data from Jellyfin"}), 500
+        logger.error(f"Error saving: {e}")
+        flash(f"Error saving configuration: {e}", "error")
+
+    return redirect(url_for('index'))
+
+@app.route('/delete/<router_id>', methods=['POST'])
+def delete_entry(router_id):
+    try:
+        create_backup()
+        config = load_config()
+        routers = config.get('http', {}).get('routers', {})
+        services = config.get('http', {}).get('services', {})
+        if router_id in routers:
+            svc = routers[router_id].get('service')
+            del routers[router_id]
+            if svc in services: del services[svc]
+            save_config(config)
+            flash(f"Deleted {router_id}", "success")
+    except Exception as e:
+        logger.error(f"Delete error: {e}")
+        flash(f"Error deleting: {e}", "error")
+    return redirect(url_for('index'))
+
+@app.route('/save-middleware', methods=['POST'])
+def save_middleware():
+    try:
+        mw_name = request.form.get('middlewareName').strip()
+        mw_content = request.form.get('middlewareContent').strip()
+        is_edit = request.form.get('isMwEdit') == 'true'
+        original_id = request.form.get('originalMwId')
+        create_backup(); config = load_config()
+        if 'middlewares' not in config['http']: config['http']['middlewares'] = {}
+        if is_edit and original_id and original_id != mw_name:
+            if original_id in config['http']['middlewares']:
+                del config['http']['middlewares'][original_id]
+        config['http']['middlewares'][mw_name] = yaml.load(mw_content)
+        save_config(config)
+        flash(f"Successfully saved middleware {mw_name}", "success")
+    except Exception as e:
+        logger.error(f"Middleware save error: {e}")
+        flash(f"Error saving middleware: {e}", "error")
+    return redirect(url_for('index'))
+
+@app.route('/delete-middleware/<mw_name>', methods=['POST'])
+def delete_middleware(mw_name):
+    try:
+        create_backup(); config = load_config()
+        mws = config.get('http', {}).get('middlewares', {})
+        if mw_name in mws:
+            del mws[mw_name]; save_config(config)
+            flash(f"Deleted middleware {mw_name}", "success")
+    except Exception as e:
+        logger.error(f"Middleware delete error: {e}")
+        flash(f"Error deleting middleware: {e}", "error")
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    logger.info("🚀 Jellyfin Proxy: Development server starting...")
-    app.run(host='0.0.0.0', port=5000)
-else:
-    logger.info("✅ Jellyfin Proxy: Server is UP and Ready (Gunicorn)")
+    app.run(host='0.0.0.0', port=5000, debug=os.environ.get('FLASK_DEBUG', 'false') == 'true')
