@@ -15,6 +15,7 @@ dist/
 images/
 custom.css
 custom.js
+display.html
 
 # Docker
 docker-compose.yml
