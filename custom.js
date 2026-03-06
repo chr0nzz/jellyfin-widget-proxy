@@ -2,7 +2,12 @@
  * Jellyfin Recently Added Widget for Homepage
  */
 
+let jellyfinWidgetInjected = false;
+
 function injectJellyfinPosters() {
+
+    if (jellyfinWidgetInjected) return;
+
     const targetCard = document.getElementById('jellyfin-recently-added');
 
     if (targetCard && !targetCard.dataset.loading && !targetCard.querySelector('.jellyfin-recent-grid')) {
@@ -49,7 +54,7 @@ function injectJellyfinPosters() {
                     if (item.type === "TV" && item.new_episodes > 1) {
                         const epBadge = document.createElement('span');
                         epBadge.className = 'jellyfin-recent-ep-badge';
-                        epBadge.innerText = `+${item.new_episodes} eps`;
+                        epBadge.innerText = item.new_episodes;
                         linkWrap.appendChild(epBadge);
                     }
 
@@ -59,7 +64,10 @@ function injectJellyfinPosters() {
                 const targetContainer = targetCard.querySelector('.flex.flex-col') || targetCard;
                 targetContainer.appendChild(grid);
 
-                console.log("Jellyfin Widget: Grid injected successfully.");
+                jellyfinWidgetInjected = true;
+                observer.disconnect();
+
+                console.log("Jellyfin Widget: Grid injected successfully. Observer disconnected.");
                 delete targetCard.dataset.loading;
             })
             .catch(err => {
