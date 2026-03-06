@@ -15,23 +15,6 @@ JELLYFIN_API_KEY = os.environ.get("JELLYFIN_API_KEY", "")
 JELLYFIN_USER_ID = os.environ.get("JELLYFIN_USER_ID", "")
 LIMIT = int(os.environ.get("LIMIT", "6"))
 
-@app.route('/debug')
-def debug_raw():
-    headers = {"Authorization": f'MediaBrowser Token="{JELLYFIN_API_KEY}"'}
-    url = f"{JELLYFIN_URL}/Users/{JELLYFIN_USER_ID}/Items"
-    params = {
-        "SortBy": "DateCreated",
-        "SortOrder": "Descending",
-        "IncludeItemTypes": "Movie,Episode",
-        "Recursive": "true",
-        "Fields": "PrimaryImageAspectRatio,ProductionYear,ServerId,SeriesId,SeriesName",
-        "Limit": 20,
-        "ImageTypeLimit": 1,
-        "EnableImageTypes": "Primary"
-    }
-    r = requests.get(url, headers=headers, params=params, timeout=10)
-    return jsonify(r.json().get("Items", []))
-
 @app.route('/health')
 def health_check():
     return jsonify({"status": "healthy"}), 200
