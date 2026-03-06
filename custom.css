@@ -41,22 +41,10 @@
     object-fit: cover;
 }
 
-.jellyfin-recent-badge {
-    position: absolute;
-    bottom: 4px;
-    left: 4px;
-    background: rgba(127, 127, 127, 0.812);
-    color: #00bb7fcc;
-    font-size: 9px;
-    padding: 1px 4px;
-    border-radius: 4px;
-    font-weight: bold;
-}
-
+.jellyfin-recent-badge,
 .jellyfin-recent-ep-badge {
     position: absolute;
-    top: 4px;
-    right: 4px;
+    bottom: 4px;
     background: rgba(0, 0, 0, 0.75);
     color: #ffffff;
     font-size: 9px;
@@ -64,4 +52,12 @@
     border-radius: 4px;
     font-weight: bold;
     backdrop-filter: blur(2px);
+}
+
+.jellyfin-recent-badge {
+    left: 4px;
+}
+
+.jellyfin-recent-ep-badge {
+    right: 4px;
 }
