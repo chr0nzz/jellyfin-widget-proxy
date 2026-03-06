@@ -52,3 +52,16 @@
     border-radius: 4px;
     font-weight: bold;
 }
+
+.jellyfin-recent-ep-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #ffffff;
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-weight: bold;
+    backdrop-filter: blur(2px);
+}
