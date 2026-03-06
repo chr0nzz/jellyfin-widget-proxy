@@ -15,6 +15,7 @@ dist/
 images/
 custom.css
 custom.js
+widget.png
 
 # Docker
 docker-compose.yml
