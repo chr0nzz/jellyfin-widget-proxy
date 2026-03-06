@@ -17,7 +17,7 @@
   ## 🖼️ Example of the Homepage widget in action.
 
   <p align="center">
-    <img src="/images/widget.png?text=Jellyfin+Widget+Preview" alt="Widget Preview" width="35%">
+    <img src="images/widget.png?text=Jellyfin+Widget+Preview" alt="Widget Preview" width="35%">
   </p>
 
   ---
